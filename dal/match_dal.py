@@ -22,6 +22,17 @@ def get_match(match_id):
         cur.execute('SELECT * FROM MATCH WHERE match_id=:1', [match_id]) 
         row = cur.fetchone() 
     return Match(*row) if row else None 
+
+def get_match_participants(match_id):
+    sql = '''SELECT mp.player_id, p.username, mp.team_id 
+             FROM MATCH_PARTICIPANT mp 
+             JOIN PLAYER p ON p.player_id=mp.player_id 
+             WHERE mp.match_id=:1'''
+    with get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(sql, [match_id])
+        cols = [d[0].lower() for d in cur.description]
+        return [dict(zip(cols, r)) for r in cur.fetchall()]
  
 def create_team(match_id, team_number, avg_team_mmr): 
     sql = '''INSERT INTO TEAM (team_id,match_id,team_number,avg_team_mmr) 
