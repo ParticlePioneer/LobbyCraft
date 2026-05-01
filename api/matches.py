@@ -27,6 +27,10 @@ def get_match(match_id: int):
     m = match_dal.get_match(match_id) 
     if not m: raise HTTPException(404, 'Match not found') 
     return m.__dict__ 
+
+@router.get('/{match_id}/participants')
+def get_participants(match_id: int):
+    return match_dal.get_match_participants(match_id)
  
 @router.post('/{match_id}/result') 
 def submit_result(match_id: int, body: MatchResult): 
