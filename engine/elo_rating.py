@@ -47,8 +47,7 @@ class EloRating(BaseRatingEngine):
             1.0 + 10 ** ((opponent_avg_mmr - player_mmr) / 400)
         )
 
-    def _actual_score(self, won: bool, placement: int,
-                      total_players: int) -> float:
+    def _actual_score(self, won: bool, placement: int,total_players: int) -> float:
         """
         Convert match outcome to actual score based on mode type.
         """
@@ -56,17 +55,9 @@ class EloRating(BaseRatingEngine):
             return placement_score(placement, total_players)
         return winloss_score(won)
 
-    def compute_delta(
-        self,
-        player_mmr: int,
-        opponent_avg_mmr: float,
-        won: bool,
-        placement: int,
-        total_players: int,
-    ) -> int:
+    def compute_delta(self,player_mmr: int,opponent_avg_mmr: float,won: bool,placement: int,total_players: int,) -> int:
         """
         Compute ELO MMR delta for one player after one match.
-
         Steps:
           1. Compute actual score from match outcome.
           2. Compute expected score from MMR gap.

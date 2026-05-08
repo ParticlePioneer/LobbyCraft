@@ -57,7 +57,6 @@ class FlatRating(BaseRatingEngine):
             raw   = round(self.win_delta * score)
         else:
             raw = self.win_delta if won else self.loss_delta
-
         return max(-self.delta_cap, min(self.delta_cap, raw))
 
     def initial_mmr(self) -> int:

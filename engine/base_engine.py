@@ -8,8 +8,7 @@ class BaseMatchmakingEngine(ABC):
     in order and never contains algorithm logic itself.
     """
 
-    def __init__(self, criteria, params: dict = None,
-                 rating_engine=None):
+    def __init__(self, criteria, params: dict = None,rating_engine=None):
         """
         criteria     : MatchmakingCriteria dataclass instance
         params       : dict loaded from ENGINE_PARAMETER table
@@ -40,8 +39,4 @@ class BaseMatchmakingEngine(ABC):
 
     @abstractmethod
     def compute_lobby_mmr(self, teams: list) -> int:
-        """
-        Given the formed teams, return the single integer MMR
-        value to stamp on the MATCH record.
-        """
         pass

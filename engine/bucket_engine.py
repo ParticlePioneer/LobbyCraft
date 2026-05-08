@@ -29,8 +29,7 @@ class BucketEngine(BaseMatchmakingEngine):
         predictable, stable MMR rewards not tied to opponent strength.
     """
 
-    def __init__(self, criteria, params: dict = None,
-                 rating_engine=None):
+    def __init__(self, criteria, params: dict = None,rating_engine=None):
         super().__init__(criteria, params, rating_engine)
         if self.rating_engine is None:
             self.rating_engine = FlatRating(
@@ -45,14 +44,13 @@ class BucketEngine(BaseMatchmakingEngine):
     def get_candidates(self, mode_id: int, region: str) -> list:
         """
         Returns ALL waiting parties for this mode.
-        No MMR filter applied — bucketing happens in
+        No MMR filter applied; bucketing happens in
         select_and_form_teams.
         """
         from dal.queue_dal import get_waiting_parties_all
         return get_waiting_parties_all(mode_id)
 
     def _assign_bucket(self, avg_mmr: float) -> int:
-        """Assign a party to a bucket index."""
         return int(avg_mmr // self.bucket_size)
 
     def _buckets_compatible(self, b1: int, b2: int) -> bool:
@@ -62,17 +60,11 @@ class BucketEngine(BaseMatchmakingEngine):
         Adjacent buckets (diff of 1) are always compatible.
         """
         return abs(b1 - b2) <= 1
-
-    def select_and_form_teams(self, candidates: list,
-                               mode) -> list | None:
-        """
-        Group parties by bucket, find the first bucket with
-        enough parties to fill the lobby, form teams from it.
-        Returns None if no bucket has enough parties.
-        """
+    
+    def select_and_form_teams(self, candidates: list,mode) -> list | None:
+        
         required = mode.max_players // mode.team_size
 
-        # Group by bucket
         bucketed: dict[int, list] = {}
         for party in candidates:
             bucket = self._assign_bucket(party.avg_mmr)

@@ -26,8 +26,4 @@ class BaseRatingEngine(ABC):
 
     @abstractmethod
     def initial_mmr(self) -> int:
-        """
-        Returns the starting MMR for a newly registered player.
-        Allows different engines to start at different baseline values.
-        """
         pass
