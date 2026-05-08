@@ -8,6 +8,8 @@ CREATE SEQUENCE seq_mm_session  START WITH 1 INCREMENT BY 1 NOCACHE NOCYCLE;
 CREATE SEQUENCE seq_queue       START WITH 1 INCREMENT BY 1 NOCACHE NOCYCLE; 
 CREATE SEQUENCE seq_match       START WITH 1 INCREMENT BY 1 NOCACHE NOCYCLE; 
 CREATE SEQUENCE seq_team        START WITH 1 INCREMENT BY 1 NOCACHE NOCYCLE; 
+CREATE SEQUENCE seq_engine START WITH 1 INCREMENT BY 1 NOCACHE NOCYCLE;
+CREATE SEQUENCE seq_param  START WITH 1 INCREMENT BY 1 NOCACHE NOCYCLE;
 
 
 CREATE TABLE SYSTEM_ROLE ( 
@@ -37,6 +39,8 @@ CREATE TABLE PLAYER (
     join_date   DATE          DEFAULT SYSDATE NOT NULL, 
     current_mmr NUMBER(6)     DEFAULT 1000    NOT NULL, 
     sys_role_id NUMBER        NOT NULL, 
+    rating_deviation    NUMBER(8,2)   DEFAULT 350, 
+    rating_volatility   NUMBER(8,4)   DEFAULT 0.06,
     CONSTRAINT uq_pl_uname   UNIQUE (username), 
     CONSTRAINT fk_pl_sysrole FOREIGN KEY (sys_role_id) REFERENCES SYSTEM_ROLE(sys_role_id) 
 ); 
@@ -67,9 +71,11 @@ CREATE TABLE MATCHMAKING_CRITERIA (
     max_mm_diff   NUMBER(5)    NOT NULL, 
     max_wait_time NUMBER(5)    NOT NULL, 
     priority_type VARCHAR2(15) NOT NULL, 
-    mode_id       NUMBER       NOT NULL, 
-    CONSTRAINT fk_mc_mode FOREIGN KEY (mode_id) REFERENCES GAME_MODE(mode_id) 
-); 
+    mode_id       NUMBER       NOT NULL,
+    engine_id     NUMBER,
+    CONSTRAINT fk_mc_mode FOREIGN KEY (mode_id) REFERENCES GAME_MODE(mode_id),
+    CONSTRAINT fk_mc_engine FOREIGN KEY (engine_id) REFERENCES MATCHMAKING_ENGINE(engine_id)
+);
 CREATE TABLE MATCHMAKING_SESSION ( 
     session_id  NUMBER       CONSTRAINT pk_mm_session PRIMARY KEY, 
     start_time  TIMESTAMP    DEFAULT SYSTIMESTAMP NOT NULL, 
@@ -132,6 +138,29 @@ CREATE TABLE MATCH_PARTICIPANT (
     CONSTRAINT fk_mp_match  FOREIGN KEY (match_id)  REFERENCES MATCH(match_id), 
     CONSTRAINT fk_mp_team   FOREIGN KEY (team_id)   REFERENCES TEAM(team_id)
 );
+
+CREATE TABLE MATCHMAKING_ENGINE (
+    engine_id    NUMBER        CONSTRAINT pk_engine PRIMARY KEY,
+    engine_name  VARCHAR2(30)  NOT NULL,
+    engine_class VARCHAR2(100) NOT NULL,
+    is_active    NUMBER(1)     DEFAULT 1 NOT NULL,
+    CONSTRAINT uq_engine_name  UNIQUE (engine_name),
+    CONSTRAINT ck_engine_active CHECK (is_active IN (0,1))
+);
+
+CREATE TABLE ENGINE_PARAMETER (
+    param_id    NUMBER        CONSTRAINT pk_param PRIMARY KEY,
+    engine_id   NUMBER        NOT NULL,
+    param_key   VARCHAR2(50)  NOT NULL,
+    param_value VARCHAR2(200) NOT NULL,
+    param_type  VARCHAR2(10)  DEFAULT 'string' NOT NULL,
+    CONSTRAINT uq_ep_key  UNIQUE (engine_id, param_key),
+    CONSTRAINT ck_ep_type CHECK (param_type IN
+                          ('int','float','bool','string')),
+    CONSTRAINT fk_ep_engine FOREIGN KEY (engine_id)
+        REFERENCES MATCHMAKING_ENGINE(engine_id)
+);
+
 CREATE INDEX idx_player_mmr    ON PLAYER(current_mmr); 
 CREATE INDEX idx_player_region ON PLAYER(region); 
 CREATE INDEX idx_queue_status  ON QUEUE(status, mode_id, enqueue_time); 
