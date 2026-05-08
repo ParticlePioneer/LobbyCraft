@@ -74,10 +74,68 @@ with tab2:
             r = requests.get(f'{API}/matches/{vm_id}') 
             if r.status_code == 200: 
                 data = r.json() 
-                st.metric('Region', data['match_region']) 
-                st.metric('Status', data['status']) 
-                st.metric('Match MMR', data['match_mmr']) 
-                st.json(data) 
+                st.markdown(f"**Mode:** {data.get('mode_name', 'Unknown')}")
+                
+                # Split metrics into columns to save vertical space
+                m1, m2 = st.columns(2)
+                with m1:
+                    st.markdown(f"**Region:** {data['match_region']}")
+                    st.markdown(f"**Match MMR:** {data['match_mmr']}")
+                    st.markdown(f"**Session ID:** {data['session_id']}")
+                with m2:
+                    st.markdown(f"**Status:** {data['status']}")
+                    # Format datetimes nicely if they exist
+                    start_t = data.get('m_start_time')
+                    end_t = data.get('m_end_time')
+                    st.markdown(f"**Start Time:** {start_t[:19].replace('T', ' ') if start_t else 'N/A'}")
+                    st.markdown(f"**End Time:** {end_t[:19].replace('T', ' ') if end_t else 'N/A'}")
+
+                # ── Winner display ────────────────────────────
+                winner_info = data.get('winner_info', {})
+                winner_type = winner_info.get('winner_type')
+                winners = winner_info.get('winners', [])
+
+                if winner_type and winners:
+                    st.markdown('---')
+                    st.markdown('#### 🏆 Winner')
+                    if winner_type == 'player':
+                        for w in winners:
+                            st.success(f"**Player:** {w['username']}  (ID: {w['player_id']})")
+                    elif winner_type == 'team':
+                        for w in winners:
+                            members = ', '.join(
+                                f"{m['username']} (ID: {m['player_id']})"
+                                for m in w.get('members', [])
+                            )
+                            st.success(
+                                f"**Winning Team** (ID: {w['team_id']})  \n"
+                                f"**Members:** {members}"
+                            )
+                    elif winner_type == 'party':
+                        for w in winners:
+                            members = ', '.join(
+                                f"{m['username']} (ID: {m['player_id']})"
+                                for m in w.get('members', [])
+                            )
+                            st.success(
+                                f"**Party ID:** {w['party_id']}  "
+                                f"({w.get('party_type', 'team')})  \n"
+                                f"**Members:** {members}"
+                            )
+                elif data['status'] == 'COMPLETED':
+                    st.info('No winner recorded for this match.')
+
+                # ── Participants table ────────────────────────
+                participants = data.get('participants', [])
+                if participants:
+                    st.markdown('---')
+                    st.markdown('#### 👥 Participants')
+                    df = pd.DataFrame(participants)
+                    display_cols = [c for c in ['player_id', 'username', 'team_id',
+                                                'placement', 'kills', 'assists',
+                                                'damage_done', 'is_winner',
+                                                'mmr_before', 'mmr_delta'] if c in df.columns]
+                    st.dataframe(df[display_cols], use_container_width=True, hide_index=True)
             else: 
                 st.warning('Match not found') 
  
