@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI 
 from fastapi.responses import RedirectResponse
 from db.connection import init_pool, close_pool 
-from api import players, parties, queue, matches 
+from api import players, parties, queue, matches, engines
 @asynccontextmanager 
 async def lifespan(app: FastAPI): 
     init_pool() 
@@ -14,6 +14,7 @@ app.include_router(parties.router, prefix='/parties', tags=['parties'])
 app.include_router(queue.router,   
 prefix='/queue',   tags=['queue']) 
 app.include_router(matches.router, prefix='/matches', tags=['matches']) 
+app.include_router(engines.router, prefix='/engines', tags=['engines']) 
 
 @app.get("/", include_in_schema=False)
 def read_root():
