@@ -28,6 +28,8 @@ class Player:
     join_date: date 
     current_mmr: int 
     sys_role_id: int 
+    rating_deviation: float
+    rating_volatility: float
  
 @dataclass 
 class Party: 
@@ -54,6 +56,7 @@ class MatchmakingCriteria:
     max_wait_time: int 
     priority_type: str 
     mode_id: int 
+    engine_id: int
 
 @dataclass 
 class MatchmakingSession: 
@@ -121,4 +124,19 @@ class LobbyTeam:
     team_number: int 
     player_ids: list 
     avg_team_mmr: float 
+    queue_no: int
 
+@dataclass
+class MatchmakingEngine:
+    engine_id:    int
+    engine_name:  str
+    engine_class: str
+    is_active:    int
+
+@dataclass
+class EngineParameter:
+    param_id:    int
+    engine_id:   int
+    param_key:   str
+    param_value: str
+    param_type:  str
