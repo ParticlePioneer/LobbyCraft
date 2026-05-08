@@ -45,12 +45,12 @@ def get_mmr_history(player_id):
  
 def set_role_preference(player_id, role_id, priority): 
     sql = '''MERGE INTO ROLE_PREFERENCE rp USING DUAL 
-             ON (rp.player_id=:1 AND rp.role_id=:2) 
-             WHEN MATCHED THEN UPDATE SET rp.priority=:3 
-             WHEN NOT MATCHED THEN INSERT (player_id,role_id,priority) VALUES (:1,:2,:3)''' 
+             ON (rp.player_id=:pid AND rp.role_id=:rid) 
+             WHEN MATCHED THEN UPDATE SET rp.priority=:pri 
+             WHEN NOT MATCHED THEN INSERT (player_id,role_id,priority) VALUES (:pid,:rid,:pri)''' 
     with get_conn() as conn: 
         try: 
-            conn.cursor().execute(sql, [player_id, role_id, priority]) 
+            conn.cursor().execute(sql, {'pid': player_id, 'rid': role_id, 'pri': priority}) 
             conn.commit()
         except Exception: 
             conn.rollback(); raise 

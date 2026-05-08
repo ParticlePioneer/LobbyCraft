@@ -32,5 +32,11 @@ def mmr_history(player_id: int):
  
 @router.post('/{player_id}/role-preferences', status_code=201) 
 def set_role_pref(player_id: int, body: RolePref): 
-    player_dal.set_role_preference(player_id, body.role_id, body.priority) 
+    try:
+        player_dal.set_role_preference(player_id, body.role_id, body.priority)
+    except oracledb.IntegrityError:
+        raise HTTPException(
+            status_code=400,
+            detail='Invalid player_id or role_id. Ensure seed.sql has inserted ROLE rows.'
+        )
     return {'status': 'ok'} 
