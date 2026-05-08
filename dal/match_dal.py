@@ -24,15 +24,94 @@ def get_match(match_id):
     return Match(*row) if row else None 
 
 def get_match_participants(match_id):
-    sql = '''SELECT mp.player_id, p.username, mp.team_id 
-             FROM MATCH_PARTICIPANT mp 
-             JOIN PLAYER p ON p.player_id=mp.player_id 
-             WHERE mp.match_id=:1'''
+    sql = '''SELECT mp.player_id, p.username, mp.team_id,
+                    mp.is_winner, mp.kills, mp.assists, mp.damage_done,
+                    mp.placement, mp.mmr_before, mp.mmr_delta
+             FROM MATCH_PARTICIPANT mp
+             JOIN PLAYER p ON p.player_id=mp.player_id
+             WHERE mp.match_id=:1
+             ORDER BY mp.placement'''
     with get_conn() as conn:
         cur = conn.cursor()
         cur.execute(sql, [match_id])
         cols = [d[0].lower() for d in cur.description]
         return [dict(zip(cols, r)) for r in cur.fetchall()]
+
+def get_match_winners(match_id):
+    """Return winner info for a match.
+    - 1 winner (BR solo)         -> winner_type='player'
+    - Team win, solo-queued      -> winner_type='team'   (team_id + members)
+    - Team win, party-queued     -> winner_type='party'  (party_id + members)
+    """
+    sql = '''SELECT mp.player_id, p.username, mp.team_id, t.team_number,
+                    pa.party_id, pa.party_type, gm.team_size, gm.mode_type
+             FROM   MATCH_PARTICIPANT mp
+             JOIN   PLAYER p  ON p.player_id  = mp.player_id
+             JOIN   TEAM   t  ON t.team_id    = mp.team_id
+             JOIN   MATCH  m  ON m.match_id   = mp.match_id
+             JOIN   GAME_MODE gm ON gm.mode_id = m.mode_id
+             LEFT JOIN PARTY_MEMBER pm ON pm.player_id = mp.player_id
+             LEFT JOIN PARTY pa        ON pa.party_id  = pm.party_id
+             WHERE  mp.match_id  = :1
+               AND  mp.is_winner = 1'''
+    with get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(sql, [match_id])
+        cols = [d[0].lower() for d in cur.description]
+        rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+
+    if not rows:
+        return {'winner_type': None, 'winners': []}
+
+    mode_type = rows[0].get('mode_type', 'battle_royale')
+
+    # Only 1 winner → individual player (BR solo)
+    if len(rows) == 1:
+        r = rows[0]
+        return {
+            'winner_type': 'player',
+            'mode_type': mode_type,
+            'winners': [{'player_id': r['player_id'],
+                         'username': r['username']}]
+        }
+
+    # Multiple winners → group by team_id
+    # Check if any winner has a non-solo party (duo/squad)
+    has_party = any(r.get('party_type') in ('duo', 'squad') for r in rows)
+
+    if has_party:
+        # Group by party_id for duo/squad winners
+        seen_parties = {}
+        for r in rows:
+            pid = r.get('party_id')
+            pt  = r.get('party_type')
+            if pid and pt in ('duo', 'squad'):
+                if pid not in seen_parties:
+                    seen_parties[pid] = {
+                        'party_id': pid,
+                        'party_type': pt,
+                        'members': []
+                    }
+                seen_parties[pid]['members'].append({
+                    'player_id': r['player_id'],
+                    'username': r['username']
+                })
+        return {
+            'winner_type': 'party',
+            'mode_type': mode_type,
+            'winners': list(seen_parties.values())
+        }
+    else:
+        # All solo-queued → show as team win with team_id
+        team_id = rows[0].get('team_id')
+        members = [{'player_id': r['player_id'],
+                     'username': r['username']} for r in rows]
+        return {
+            'winner_type': 'team',
+            'mode_type': mode_type,
+            'winners': [{'team_id': team_id,
+                         'members': members}]
+        }
  
 def create_team(match_id, team_number, avg_team_mmr): 
     sql = '''INSERT INTO TEAM (team_id,match_id,team_number,avg_team_mmr) 

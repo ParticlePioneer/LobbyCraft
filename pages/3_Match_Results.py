@@ -74,21 +74,13 @@ with tab2:
             r = requests.get(f'{API}/matches/{vm_id}') 
             if r.status_code == 200: 
                 data = r.json() 
-                st.markdown(f"**Mode:** {data.get('mode_name', 'Unknown')}")
-                
-                # Split metrics into columns to save vertical space
-                m1, m2 = st.columns(2)
-                with m1:
-                    st.markdown(f"**Region:** {data['match_region']}")
-                    st.markdown(f"**Match MMR:** {data['match_mmr']}")
-                    st.markdown(f"**Session ID:** {data['session_id']}")
-                with m2:
-                    st.markdown(f"**Status:** {data['status']}")
-                    # Format datetimes nicely if they exist
-                    start_t = data.get('m_start_time')
-                    end_t = data.get('m_end_time')
-                    st.markdown(f"**Start Time:** {start_t[:19].replace('T', ' ') if start_t else 'N/A'}")
-                    st.markdown(f"**End Time:** {end_t[:19].replace('T', ' ') if end_t else 'N/A'}")
+                st.metric('Mode', data.get('mode_name', 'Unknown'))
+                st.metric('Region', data['match_region']) 
+                st.metric('Status', data['status']) 
+                st.metric('Match MMR', data['match_mmr']) 
+
+                with st.expander("View Raw JSON Data (All Match Info)"):
+                    st.json(data)
 
                 # ── Winner display ────────────────────────────
                 winner_info = data.get('winner_info', {})
