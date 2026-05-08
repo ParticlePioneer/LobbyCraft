@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel 
 from dal import queue_dal, session_dal 
 from engine.matchmaker import assemble_lobby 
+from engine.loader import load_engine_for_mode
 from db.connection import get_conn 
 from models.entities import GameMode, MatchmakingCriteria 
  
@@ -30,11 +31,16 @@ def enqueue(body: EnqueueReq):
         entry = queue_dal.enqueue_party(body.party_id, body.mode_id, gm.mode_type) 
     except ValueError as e: 
         raise HTTPException(409, str(e)) 
-    session = session_dal.create_session(mc.criteria_id) 
-    match_id = assemble_lobby( 
-        mode=gm, criteria=mc, session_id=session.session_id, region='AS-EAST') 
-    if not match_id: 
-        session_dal.fail_session(session.session_id) 
+    session = session_dal.create_session(mc.criteria_id)
+    try:
+        engine = load_engine_for_mode(gm.mode_id, mc)
+        match_id = assemble_lobby(
+            engine=engine, mode=gm, session_id=session.session_id, region='AS-EAST')
+        if not match_id:
+            session_dal.fail_session(session.session_id)
+    except Exception as e:
+        session_dal.fail_session(session.session_id)
+        raise HTTPException(status_code=500, detail=f'Lobby assembly failed: {e}')
     return {'queue_no': entry.queue_no, 'match_id': match_id} 
  
 @router.post('/expire-timeouts') 

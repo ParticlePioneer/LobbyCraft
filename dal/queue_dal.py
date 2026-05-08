@@ -62,6 +62,30 @@ def mark_matched(queue_nos):
             conn.commit() 
         except Exception: 
             conn.rollback(); raise 
+
+def get_waiting_parties_all(mode_id):
+    """Fetch ALL waiting parties for a mode (no MMR filter). Used by BucketEngine."""
+    sql = '''
+        SELECT q.queue_no, q.party_id, q.enqueue_time,
+               AVG(p.current_mmr) AS avg_mmr,
+               LISTAGG(p.player_id,',') WITHIN GROUP (ORDER BY p.player_id) AS pids
+        FROM   QUEUE q
+        JOIN   PARTY_MEMBER pm ON pm.party_id=q.party_id
+        JOIN   PLAYER p        ON p.player_id=pm.player_id
+        WHERE  q.status='WAITING' AND q.mode_id=:1
+        GROUP  BY q.queue_no, q.party_id, q.enqueue_time
+        ORDER  BY q.enqueue_time ASC'''
+    with get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(sql, [mode_id])
+        rows = cur.fetchall()
+    result = []
+    for qno, paid, et, avg_mmr, pids_str in rows:
+        result.append(PartyWithMMR(
+            queue_no=qno, party_id=paid,
+            player_ids=[int(x) for x in str(pids_str).split(',')],
+            avg_mmr=float(avg_mmr), enqueue_time=et))
+    return result
  
 def expire_stale(): 
     sql = '''UPDATE QUEUE q SET q.status='EXPIRED' 
