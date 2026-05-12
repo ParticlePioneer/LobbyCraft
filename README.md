@@ -1,65 +1,63 @@
-# LobbyCraft Matchmaking System
+# LobbyCraft — Matchmaking System
 
-Database-driven multiplayer matchmaking system for **Battle Royale** and **Competitive Shooter** modes, built as a DBMS course project.
+Database-backed multiplayer matchmaking for **Battle Royale** and **Competitive Shooter** modes (DBMS course project: **LobbyCraft**).
 
-Tech stack:
-- Python 3.12
-- FastAPI
-- Streamlit
-- Oracle Database (Autonomous/FreeSQL compatible)
-
----
-
-## 1) Project Overview
-
-This project models the full matchmaking lifecycle:
-- player registration and profile management
-- party creation and queue entry
-- criteria-based matchmaking sessions
-- match/team/participant persistence
-- post-match stats ingestion and MMR updates
-- analytics (leaderboards, lobby quality, MMR history)
-
-It includes:
-- normalized Oracle schema (BCNF-oriented design)
-- stored procedures for session and queue operations
-- REST API layer
-- Streamlit dashboard
-- test suite with `pytest`
+| Layer | Technology |
+|-------|------------|
+| Runtime | **Python 3.12** |
+| API | **FastAPI** (`uvicorn`) |
+| UI | **Streamlit** (multipage app) |
+| Database | **Oracle** (Autonomous / FreeSQL / compatible; `oracledb`) |
 
 ---
 
-## 2) Python Compatibility
+## Overview
 
-This project is set up to run with **Python 3.12**.
+The system covers the full matchmaking lifecycle:
 
-Check your version:
+- **Players** — registration, regions, MMR snapshot, optional role preferences  
+- **Parties** — solo / duo / squad and membership  
+- **Queues & modes** — enqueue by `mode_id`, duplicate-queue guards, wait monitoring, stale expiration  
+- **Sessions & matches** — criteria-bound sessions, lobby assembly, teams and participants  
+- **Results & rating** — post-match stats, MMR deltas, history reconstruction  
+- **Analytics** — leaderboards, lobby fairness (`lobby-quality`), MMR trends  
+
+### Architecture highlights
+
+- **Relational core (Oracle)** — normalized schema, sequences, constraints, indexes; optional PL/SQL procedures under `db/procedures.sql`.  
+- **Pluggable matchmaking engines** — engines are registered in the DB (`MATCHMAKING_ENGINE`, `ENGINE_PARAMETER`); **criteria** rows bind each mode’s policy to an **engine** (`MATCHMAKING_CRITERIA.engine_id`). The API resolves and loads the correct Python engine class at runtime (`engine/loader.py`).  
+- **Rating policies** — separated from lobby assembly; configurable per engine parameters (see engine docs in code).  
+
+Optional **future / hybrid** extensions (described in project documentation, not required to run this repo):
+
+- **MongoDB** — denormalized read models (e.g. match detail documents).  
+- **ChromaDB** — vector indexes for similarity/analytics experiments (not wired by default).
+
+---
+
+## Prerequisites
+
+- **Python 3.12** (`python --version` → `Python 3.12.x`)  
+- Oracle database reachable from your machine  
+- **`pip`** (comes with Python)  
+
+Recommended for DB setup:
+
+- SQL Developer, SQLcl, or SQL*Plus to run `db/*.sql`
+
+---
+
+## Quick start
+
+### 1. Clone / open project
 
 ```powershell
-python --version
+cd "D:\DBMS project\matchmaking"
 ```
 
-Expected: `Python 3.12.x`
+### 2. Virtual environment & dependencies
 
----
-
-## 3) Prerequisites
-
-Install:
-- Python 3.12
-- Oracle DB access (Autonomous DB / Oracle FreeSQL / local Oracle)
-- `pip` (bundled with Python)
-
-Optional but recommended:
-- SQL Developer or SQLcl for running SQL files
-
----
-
-## 4) Clone and Setup
-
-From project root (`matchmaking`):
-
-### Windows (PowerShell)
+**Windows (PowerShell)**
 
 ```powershell
 python -m venv venv
@@ -68,7 +66,7 @@ python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-### macOS/Linux (bash/zsh)
+**macOS / Linux**
 
 ```bash
 python3.12 -m venv venv
@@ -77,11 +75,9 @@ python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
----
+### 3. Environment file
 
-## 5) Environment Variables (`.env`)
-
-Create a `.env` file in the project root:
+Create `.env` in the project root:
 
 ```env
 oracle_user=YOUR_DB_USERNAME
@@ -91,27 +87,24 @@ api_host=0.0.0.0
 api_port=8000
 ```
 
-### `oracle_dsn` examples
+**`oracle_dsn` examples**
 
-- Easy Connect style:
-  - `host:port/service_name`
-- Autonomous DB format (example):
-  - `adb.region.oraclecloud.com:1522/xxxx_high.adb.oraclecloud.com`
+- Easy Connect: `host:port/service_name`  
+- Autonomous DB (shape): `adb.region.oraclecloud.com:1522/your_service.adb.oraclecloud.com`  
 
-> Make sure the credentials in `.env` have permission to create tables, sequences, procedures, and indexes.
+The DB user must be able to create tables, sequences, indexes, and procedures (as defined in `db/ddl.sql`).
 
----
+### 4. Initialize the database
 
-## 6) Database Initialization
+Execute **in order**:
 
-You must run schema scripts once before starting API/UI.
+1. `db/ddl.sql` — schema (includes engine tables if your revision matches the repo)  
+2. `db/seed.sql` — reference data (modes, roles, criteria, etc.)  
+3. `db/procedures.sql` — stored procedures (session / queue / finalize)  
 
-SQL files:
-- `db/ddl.sql` (tables, constraints, indexes, sequences)
-- `db/seed.sql` (lookup and initial rows)
-- `db/procedures.sql` (PL/SQL procedures)
+If your instructor provides additional **`engine_*`** seed scripts, run them after `seed.sql` so `MATCHMAKING_ENGINE` / `ENGINE_PARAMETER` and `criteria.engine_id` are populated.
 
-### Option A: SQL*Plus / SQLcl
+**SQL*Plus / SQLcl**
 
 ```sql
 @db/ddl.sql
@@ -119,179 +112,150 @@ SQL files:
 @db/procedures.sql
 ```
 
-### Option B: SQL Developer
-Open each file and execute in this order:
-1. `db/ddl.sql`
-2. `db/seed.sql`
-3. `db/procedures.sql`
+### 5. Run the API
 
----
-
-## 7) Run the Backend API
-
-From project root (with venv active):
+From project root with venv active:
 
 ```powershell
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-API docs:
-- Swagger UI: <http://localhost:8000/docs>
+- Swagger UI: <http://localhost:8000/docs>  
+- Root `/` redirects to `/docs`  
 
-Root endpoint redirects to docs.
+Using `python -m uvicorn` avoids PATH issues when `uvicorn` is not on `PATH`.
 
----
-
-## 8) Run the Streamlit UI
-
-In a second terminal (venv active):
+### 6. Run the Streamlit UI (second terminal)
 
 ```powershell
 streamlit run streamlit_app.py
 ```
 
-Default UI URL:
-- <http://localhost:8501>
+Default: <http://localhost:8501>  
 
-Main pages:
-- Players
-- Parties & Queue
-- Match Results
-- Analytics
+Pages typically include Players, Parties & Queue, Match Results, Analytics, and **Engine Lab** (if present).
 
 ---
 
-## 9) Seeding Data
+## Multi-engine configuration (summary)
 
-### Quick scenario seed
+| Concept | Location |
+|--------|-----------|
+| Engine registry | `MATCHMAKING_ENGINE` (`engine_id`, `engine_name`, `engine_class`, `is_active`) |
+| Tunables | `ENGINE_PARAMETER` (`engine_id`, `param_key`, `param_value`, `param_type`) |
+| Policy → engine | `MATCHMAKING_CRITERIA.engine_id` → chosen implementation |
+| Loader | `engine/loader.py` — loads Python class from `engine_class`, merges parameters |
 
-Creates players, parties, queue entries, assembles one match, submits random results:
+REST routes under **`/engines`** (see `api/engines.py`) support listing engines, viewing mode–criteria–engine mappings, and updating which engine is assigned to a criteria row (for demos / experiments).
+
+Queue handling (`api/queue.py`) resolves criteria, loads the engine, and runs `engine/matchmaker.py::assemble_lobby`.
+
+---
+
+## Optional: MongoDB & ChromaDB (documentation / future work)
+
+This repository’s **runtime path is Oracle + FastAPI**. For coursework or scaling narratives you may document:
+
+| Store | Typical use |
+|-------|-------------|
+| **MongoDB** | Denormalized documents for match detail, player profiles with embedded recent matches, engine config snapshots for fast reads |
+| **ChromaDB** | Vector embeddings for similarity search (e.g. behavioral similarity, anomaly clustering) — auxiliary to transactional Oracle data |
+
+A safe production pattern is **Oracle as source of truth** plus derived MongoDB views and optional vector indexes — not a replacement for FK integrity on day one.
+
+---
+
+## Data seeding & demos
+
+| Script | Purpose |
+|--------|---------|
+| `seed_db.py` | Small scripted flow: players, party, queue, match assembly, sample results |
+| `seed_massive.py` | Larger synthetic dataset for analytics / load-style experiments |
 
 ```powershell
 python seed_db.py
-```
-
-### Large dataset seed
-
-Generates many players and matches for analytics/load-style testing:
-
-```powershell
 python seed_massive.py
 ```
 
 ---
 
-## 10) Run Tests
+## Testing & sanity checks
 
-With API dependencies installed and DB configured:
+**Automated API tests**
 
 ```powershell
 pytest -q
 ```
 
-Test file:
-- `tests/test_api.py`
+Primary suite: `tests/test_api.py` (players, parties, queue, MMR history, expire-timeouts, leaderboard).
 
-Current tests cover:
-- player creation and duplicate prevention
-- party creation
-- queue enqueue and duplicate queue rejection
-- MMR history endpoint behavior
-- timeout expiration endpoint
-- leaderboard endpoint
+**End-to-end smoke (requires API running)**
 
----
+```powershell
+python -m tests.sanity
+```
 
-## 11) Core API Route Groups
-
-- `/players`
-  - create player
-  - get player
-  - get MMR history
-  - set role preference
-- `/parties`
-  - create party
-  - get party
-  - get party members
-- `/queue`
-  - enqueue party
-  - waiting monitor
-  - expire stale queue entries
-- `/matches`
-  - get match
-  - get participants
-  - submit/finalize results
-  - lobby quality analytics
-  - leaderboard
-
-Use Swagger for exact request/response schemas:
-- <http://localhost:8000/docs>
+Uses `http://localhost:8000` — start `uvicorn` first.
 
 ---
 
-## 12) Recommended Run Order (First-Time Setup)
+## Main API surface
 
-1. Create and activate virtual environment  
-2. Install requirements  
-3. Create `.env`  
-4. Execute SQL scripts (`ddl.sql`, `seed.sql`, `procedures.sql`)  
-5. Start FastAPI (`uvicorn ...`)  
-6. Start Streamlit (`streamlit run streamlit_app.py`)  
-7. (Optional) Run `seed_db.py` or `seed_massive.py`  
-8. (Optional) Run tests (`pytest -q`)  
+| Prefix | Purpose |
+|--------|---------|
+| `/players` | CRUD-ish player ops, MMR history, role preferences |
+| `/parties` | Create party, members |
+| `/queue` | Enqueue, waiting monitor, expire timeouts |
+| `/matches` | Match detail (with mode / participants / winner where implemented), results, lobby quality, leaderboard |
+| `/engines` | Engine registry and criteria ↔ engine assignment |
 
----
-
-## 13) Common Troubleshooting
-
-### A) `RuntimeError: Pool not initialised`
-- Ensure API starts through `main.py` (lifespan initializes pool)
-- Confirm `.env` exists and values are valid
-
-### B) Oracle authentication / DSN errors
-- Recheck `oracle_user`, `oracle_password`, `oracle_dsn`
-- Verify network/firewall access to DB host and port
-- Verify DB user privileges
-
-### C) UI says API offline
-- Ensure backend is running on `http://localhost:8000`
-- Check `uvicorn` terminal for startup errors
-
-### D) `table or view does not exist`
-- Re-run DB scripts in correct order:
-  1) `db/ddl.sql`
-  2) `db/seed.sql`
-  3) `db/procedures.sql`
-
-### E) `pytest` failures caused by DB state
-- Ensure database is reachable
-- Ensure schema + seed scripts are already applied
+Full schemas: **Swagger** at `/docs`.
 
 ---
 
-## 14) Project Structure
+## Troubleshooting
+
+| Issue | What to check |
+|-------|----------------|
+| `RuntimeError: Pool not initialised` | Start app via `main.py` so lifespan runs; valid `.env` |
+| Oracle login / DSN errors | Credentials, network, wallet if Autonomous |
+| `table or view does not exist` | Run `ddl.sql` → `seed.sql` → `procedures.sql` in order |
+| UI “API offline” | API on port **8000**, no firewall block |
+| Engine errors at enqueue | `MATCHMAKING_CRITERIA.engine_id` set; row in `MATCHMAKING_ENGINE`; `ENGINE_PARAMETER` if required |
+| `uvicorn` not found | Use `python -m uvicorn ...` from activated venv |
+| pytest fails | DB up, schema seeded, same `.env` as manual runs |
+
+---
+
+## Project layout
 
 ```text
 matchmaking/
-├─ api/                  # FastAPI route modules
-├─ dal/                  # Data access layer
-├─ db/                   # DB connection + SQL scripts
-├─ engine/               # Matchmaking/MMR logic
-├─ models/               # Entity models
-├─ pages/                # Streamlit multipage views
-├─ tests/                # Pytest tests
-├─ main.py               # FastAPI app entry
-├─ streamlit_app.py      # Streamlit app entry
-├─ seed_db.py            # scenario seed
-├─ seed_massive.py       # large seed
-└─ requirements.txt
+├── api/              # FastAPI routers (players, parties, queue, matches, engines)
+├── dal/              # Data access layer
+├── db/               # connection.py, ddl.sql, seed.sql, procedures.sql
+├── engine/           # Engines, loader, matchmaker orchestration, rating helpers
+├── models/           # Dataclasses / entities
+├── pages/            # Streamlit pages
+├── tests/            # pytest + sanity script
+├── main.py           # FastAPI entry + lifespan pool
+├── streamlit_app.py  # Streamlit entry
+├── seed_db.py
+├── seed_massive.py
+├── config.py         # pydantic-settings / .env
+└── requirements.txt
 ```
 
 ---
 
-## 15) Notes
+## Security & hygiene
 
-- Keep secrets only in `.env` (never commit credentials).
-- If you modify schema, re-validate APIs and tests.
-- For grading/demo, keep API + Streamlit running simultaneously.
+- Do **not** commit `.env` or credentials.  
+- Treat production Oracle credentials separately from coursework DBs.  
+- After schema changes, rerun migrations/seeds and `pytest`.
 
+---
+
+## Course / report alignment
+
+This README matches the implemented stack: **Oracle relational model**, **multi-engine criteria binding**, **FastAPI + Streamlit**, **Python 3.12**. Sections on **MongoDB** and **ChromaDB** describe optional hybrid extensions suitable for architecture discussion in reports, not mandatory dependencies for running this repo.
